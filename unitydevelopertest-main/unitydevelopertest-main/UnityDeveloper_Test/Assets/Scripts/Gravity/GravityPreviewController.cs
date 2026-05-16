@@ -26,25 +26,25 @@ namespace GravityPuzzle.Player
         {
             bool hasSelection = false;
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (Input.GetKeyDown(KeyCode.DownArrow))
             {
                 selectedDirection = GravityDirection.Forward;
                 hasSelection = true;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (Input.GetKeyDown(KeyCode.UpArrow))
             {
                 selectedDirection = GravityDirection.Backward;
                 hasSelection = true;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (Input.GetKeyDown(KeyCode.RightArrow))
             {
                 selectedDirection = GravityDirection.Left;
                 hasSelection = true;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (Input.GetKeyDown(KeyCode.LeftArrow))
             {
                 selectedDirection = GravityDirection.Right;
                 hasSelection = true;

@@ -1,5 +1,6 @@
+using DG.Tweening;
+using GravityPuzzle.UI;
 using UnityEngine;
-using TMPro;
 
 namespace GravityPuzzle.Core
 {
@@ -7,52 +8,64 @@ namespace GravityPuzzle.Core
     {
         public static GameManager Instance;
 
-        [SerializeField] private float gameTime = 120f;
+        [Header("Panels")]
+        [SerializeField] private CanvasGroup gameLosePanel;
+        [SerializeField] private RectTransform gameLosePopup;
 
-        [SerializeField] private TMP_Text timerText;
-        [SerializeField] private GameObject gameOverPanel;
-        [SerializeField] private GameObject winPanel;
+        [SerializeField] private CanvasGroup winPanel;
+        [SerializeField] private RectTransform winPopup;
 
-        [SerializeField] private int totalCubes;
+        [Header("Gameplay")]
+        [SerializeField] private int totalCubesToCollect = 5;
 
-        private int collectedCubes;
+        public int CollectedCubes { get; private set; }
+
         private bool gameEnded;
 
         private void Awake()
         {
             Instance = this;
+
+            InitializePanels();
         }
 
-        private void Update()
+        private void InitializePanels()
         {
-            if (gameEnded)
-                return;
-
-            UpdateTimer();
+            SetupPanel(gameLosePanel, gameLosePopup);
+            SetupPanel(winPanel, winPopup);
         }
 
-        private void UpdateTimer()
+        private void SetupPanel(
+            CanvasGroup panel,
+            RectTransform popup)
         {
-            gameTime -= Time.deltaTime;
+            panel.alpha = 0f;
+            panel.interactable = false;
+            panel.blocksRaycasts = false;
 
-            if (gameTime <= 0f)
-            {
-                gameTime = 0f;
-                LoseGame();
-            }
+            popup.localScale = Vector3.zero;
 
-            int minutes = Mathf.FloorToInt(gameTime / 60f);
-            int seconds = Mathf.FloorToInt(gameTime % 60f);
-
-            timerText.text = $"{minutes:00}:{seconds:00}";
+            panel.gameObject.SetActive(false);
         }
 
         public void CollectCube()
         {
-            collectedCubes++;
+            if (gameEnded)
+                return;
 
-            if (collectedCubes >= totalCubes)
+            CollectedCubes++;
+
+            Debug.Log(
+                $"Collected Cubes: {CollectedCubes}/{totalCubesToCollect}");
+
+            UIManager.Instance.UpdateCubeText(
+                CollectedCubes,
+                totalCubesToCollect);
+
+            if (CollectedCubes >= totalCubesToCollect)
+            {
                 WinGame();
+            }
         }
 
         public void LoseGame()
@@ -61,15 +74,49 @@ namespace GravityPuzzle.Core
                 return;
 
             gameEnded = true;
-            Time.timeScale = 0f;
-            gameOverPanel.SetActive(true);
+
+            AnimatePanel(
+                gameLosePanel,
+                gameLosePopup);
         }
 
         private void WinGame()
         {
+            if (gameEnded)
+                return;
+
             gameEnded = true;
-            Time.timeScale = 0f;
-            winPanel.SetActive(true);
+
+            AnimatePanel(
+                winPanel,
+                winPopup);
+        }
+
+        private void AnimatePanel(
+            CanvasGroup panel,
+            RectTransform popup)
+        {
+            panel.gameObject.SetActive(true);
+
+            panel.interactable = true;
+            panel.blocksRaycasts = true;
+
+            panel.alpha = 0f;
+            popup.localScale = Vector3.zero;
+
+            Sequence sequence = DOTween.Sequence();
+
+            sequence.Append(
+                panel.DOFade(1f, 0.25f));
+
+            sequence.Join(
+                popup.DOScale(1f, 0.4f)
+                .SetEase(Ease.OutBack));
+
+            sequence.OnComplete(() =>
+            {
+                Time.timeScale = 0f;
+            });
         }
     }
 }

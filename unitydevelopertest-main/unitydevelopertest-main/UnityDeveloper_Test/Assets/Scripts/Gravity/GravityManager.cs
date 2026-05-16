@@ -6,8 +6,6 @@ namespace GravityPuzzle.Gravity
     {
         public static GravityManager Instance;
 
-        [SerializeField] private float gravityStrength = 25f;
-
         public Vector3 CurrentGravity { get; private set; } = Vector3.down;
 
         private void Awake()
@@ -48,8 +46,6 @@ namespace GravityPuzzle.Gravity
                     CurrentGravity = Vector3.back;
                     break;
             }
-
-            Physics.gravity = CurrentGravity * gravityStrength;
         }
     }
 }
