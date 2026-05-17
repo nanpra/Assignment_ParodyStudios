@@ -2,7 +2,6 @@ using UnityEngine;
 
 namespace GravityPuzzle.Player
 {
-    [RequireComponent(typeof(Animator))]
     public class PlayerAnimationController : MonoBehaviour
     {
         private Animator animator;

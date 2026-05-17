@@ -4,8 +4,6 @@ using UnityEngine;
 
 namespace GravityPuzzle.Player
 {
-    [RequireComponent(typeof(CharacterController))]
-    [RequireComponent(typeof(PlayerAnimationController))]
     public class PlayerController : MonoBehaviour
     {
         public static PlayerController Instance;
@@ -13,7 +11,8 @@ namespace GravityPuzzle.Player
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 6f;
         [SerializeField] private float rotationSpeed = 10f;
-        [SerializeField] private float jumpForce = 10f;
+        [SerializeField] private float jumpForce = 6f;
+        [SerializeField] private float jumpCooldown = 0.35f;
 
         [Header("Gravity")]
         [SerializeField] private float gravityForce = 25f;
@@ -25,16 +24,23 @@ namespace GravityPuzzle.Player
         [Header("Free Fall")]
         [SerializeField] private float maxAirTimeBeforeDeath = 2f;
 
-        private CharacterController controller;
-        private Camera mainCam;
+        private Rigidbody body;
+        private CapsuleCollider capsule;
         private PlayerAnimationController animationController;
+        private Camera mainCam;
 
-        private Vector3 velocity;
+        private Vector2 moveInput;
+        private bool jumpRequested;
+
+        private Vector3 defaultForwardDirection;
+        private Vector3 currentFacingDirection;
+        private Vector3 gravityDirection;
         private Vector3 moveDirection;
+        private Vector3 velocity;
 
-        private bool isGrounded;
+        private float nextJumpAllowedTime;
         private float airTimer;
-        private Vector3 airborneMomentum;
+        private bool isGrounded;
 
         public bool IsGrounded => isGrounded;
 
@@ -42,127 +48,245 @@ namespace GravityPuzzle.Player
         {
             Instance = this;
 
-            controller = GetComponent<CharacterController>();
+            body = GetComponent<Rigidbody>();
+            capsule = GetComponent<CapsuleCollider>();
             animationController = GetComponent<PlayerAnimationController>();
-
             mainCam = Camera.main;
+
+            body.useGravity = false;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+
+            defaultForwardDirection = transform.forward.normalized;
+            if (defaultForwardDirection.sqrMagnitude < 0.0001f)
+                defaultForwardDirection = Vector3.forward;
+
+            currentFacingDirection = defaultForwardDirection;
         }
 
         private void Update()
         {
-            CheckGround();
-            HandleMovement();
-            HandleGravity();
-            HandleJump();
-            HandleFreeFall();
-            AlignToGravity();
+            ReadInput();
 
-            controller.Move(velocity * Time.deltaTime);
+            if (Input.GetKeyDown(KeyCode.Space))
+                jumpRequested = true;
 
             animationController.UpdateAnimationState(
                 moveDirection,
                 velocity,
                 isGrounded,
-                GravityManager.Instance.CurrentGravity);
+                gravityDirection);
         }
 
-        private void HandleMovement()
+        private void FixedUpdate()
         {
-            if(!isGrounded)
-                return;
+            UpdateGravityDirection();
+            HandleGroundCheck();
+            HandleGravityAlignmentAndFacing();
+            HandleJump();
+            HandleGravity();
+            HandleMovement();
+            HandleFreeFall();
 
-            float horizontal = Input.GetAxisRaw("Horizontal");
-            float vertical = Input.GetAxisRaw("Vertical");
+            velocity = body.linearVelocity;
+        }
 
-            Vector3 gravityUp =
-                -GravityManager.Instance.CurrentGravity.normalized;
+        private void ReadInput()
+        {
+            moveInput.x = 0f;
+            moveInput.y = 0f;
 
-            Vector3 camForward =
-                Vector3.ProjectOnPlane(mainCam.transform.forward, gravityUp).normalized;
+            if (Input.GetKey(KeyCode.A))
+                moveInput.x = -1f;
+            else if (Input.GetKey(KeyCode.D))
+                moveInput.x = 1f;
 
-            Vector3 camRight =
-                Vector3.ProjectOnPlane(mainCam.transform.right, gravityUp).normalized;
+            if (Input.GetKey(KeyCode.S))
+                moveInput.y = -1f;
+            else if (Input.GetKey(KeyCode.W))
+                moveInput.y = 1f;
+        }
 
-            moveDirection =
-                (camForward * vertical + camRight * horizontal).normalized;
+        private void UpdateGravityDirection()
+        {
+            gravityDirection =
+                GravityManager.Instance.CurrentGravity.normalized;
+        }
 
-            Vector3 movement =
-                moveDirection * moveSpeed;
+        private void HandleGroundCheck()
+        {
+            Vector3 castOrigin =
+                transform.TransformPoint(capsule.center);
 
-            Vector3 gravityVelocity =
-                Vector3.Project(
-                    velocity,
-                    GravityManager.Instance.CurrentGravity);
+            float horizontalScale =
+                Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.z));
 
-            velocity =
-                moveDirection * moveSpeed + gravityVelocity;
+            float verticalScale =
+                Mathf.Abs(transform.lossyScale.y);
 
-            controller.Move(movement * Time.deltaTime);
+            float castRadius =
+                Mathf.Max(0.05f, capsule.radius * horizontalScale * 0.95f);
 
-            if (moveDirection.sqrMagnitude > 0.01f)
+            float halfHeight =
+                Mathf.Max(capsule.height * verticalScale * 0.5f, castRadius);
+
+            float castDistance =
+                Mathf.Max(0.05f, halfHeight - castRadius) + groundCheckDistance;
+
+            isGrounded = Physics.SphereCast(
+                castOrigin,
+                castRadius,
+                gravityDirection,
+                out _,
+                castDistance,
+                groundMask,
+                QueryTriggerInteraction.Ignore);
+        }
+
+        private void HandleGravityAlignmentAndFacing()
+        {
+            Vector3 gravityUp = -gravityDirection;
+            GetReferenceMovementBasis(out Vector3 basisForward, out Vector3 basisRight);
+
+            Vector3 desiredFacing =
+                Vector3.ProjectOnPlane(currentFacingDirection, gravityDirection).normalized;
+
+            if (desiredFacing.sqrMagnitude < 0.0001f)
+                desiredFacing = basisForward;
+
+            bool hasMoveInput =
+                Mathf.Abs(moveInput.x) > 0.1f || Mathf.Abs(moveInput.y) > 0.1f;
+
+            if (hasMoveInput)
             {
-                Quaternion targetRotation =
-                    Quaternion.LookRotation(moveDirection, gravityUp);
-
-                transform.rotation = Quaternion.Slerp(
-                    transform.rotation,
-                    targetRotation,
-                    rotationSpeed * Time.deltaTime);
+                desiredFacing =
+                    (basisForward * moveInput.y + basisRight * moveInput.x).normalized;
             }
-        }
 
-        private void HandleGravity()
-        {
-            velocity += gravityForce
-                * Time.deltaTime
-                * GravityManager.Instance.CurrentGravity;
+            if (desiredFacing.sqrMagnitude < 0.0001f)
+                desiredFacing = basisForward;
+
+            Quaternion targetRotation =
+                Quaternion.LookRotation(
+                    desiredFacing.normalized,
+                    gravityUp);
+
+            float rotationBlend =
+                1f - Mathf.Exp(-rotationSpeed * Time.fixedDeltaTime);
+
+            Quaternion smoothedRotation = Quaternion.Slerp(
+                body.rotation,
+                targetRotation,
+                rotationBlend);
+            body.MoveRotation(smoothedRotation);
+
+            currentFacingDirection =
+                Vector3.ProjectOnPlane(
+                    smoothedRotation * Vector3.forward,
+                    gravityDirection).normalized;
+
+            if (currentFacingDirection.sqrMagnitude < 0.0001f)
+                currentFacingDirection = desiredFacing;
         }
 
         private void HandleJump()
         {
+            if (!jumpRequested)
+                return;
+
+            jumpRequested = false;
+
             if (!isGrounded)
                 return;
 
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Time.time < nextJumpAllowedTime)
+                return;
+
+            Vector3 currentVelocity = body.linearVelocity;
+            float gravityVelocity =
+                Vector3.Dot(currentVelocity, gravityDirection);
+
+            if (gravityVelocity > 0f)
             {
-                airborneMomentum =
-                    Vector3.ProjectOnPlane(
-                        velocity,
-                        GravityManager.Instance.CurrentGravity);
-
-                velocity =
-                    airborneMomentum +
-                    (-GravityManager.Instance.CurrentGravity.normalized * jumpForce);
-
-                isGrounded = false;
+                currentVelocity -= gravityDirection * gravityVelocity;
             }
+
+            currentVelocity += -gravityDirection * jumpForce;
+            body.linearVelocity = currentVelocity;
+
+            isGrounded = false;
+            nextJumpAllowedTime = Time.time + jumpCooldown;
         }
 
-        private void CheckGround()
+        private void HandleGravity()
         {
-            Vector3 gravityDirection =
-                GravityManager.Instance.CurrentGravity.normalized;
+            body.AddForce(
+                gravityDirection * gravityForce,
+                ForceMode.Acceleration);
+        }
 
-            Vector3 origin =
-                transform.position;
+        private void HandleMovement()
+        {
+            GetReferenceMovementBasis(out Vector3 forward, out Vector3 right);
 
-            bool hitGround = Physics.Raycast(
-                origin,
-                gravityDirection,
-                controller.height * 0.6f + groundCheckDistance,
-                groundMask,
-                QueryTriggerInteraction.Ignore);
+            Vector3 desiredMoveDirection =
+                (forward * moveInput.y + right * moveInput.x).normalized;
 
-            isGrounded = hitGround;
+            moveDirection = desiredMoveDirection;
 
-            if (isGrounded)
+            Vector3 desiredPlanarVelocity = moveDirection * moveSpeed;
+
+            Vector3 currentVelocity = body.linearVelocity;
+            float gravityVelocity =
+                Vector3.Dot(currentVelocity, gravityDirection);
+
+            Vector3 gravityComponent =
+                gravityDirection * gravityVelocity;
+
+            body.linearVelocity =
+                desiredPlanarVelocity + gravityComponent;
+
+            body.angularVelocity = Vector3.zero;
+        }
+
+        private void GetReferenceMovementBasis(out Vector3 forward, out Vector3 right)
+        {
+            Vector3 gravityUp = -gravityDirection;
+
+            if (mainCam == null)
+                mainCam = Camera.main;
+
+            if (mainCam != null)
             {
-                float gravityVelocity =
-                    Vector3.Dot(velocity, gravityDirection);
-
-                if (gravityVelocity > 0)
-                    velocity -= gravityDirection * gravityVelocity;
+                forward =
+                    Vector3.ProjectOnPlane(
+                        mainCam.transform.forward,
+                        gravityDirection).normalized;
             }
+            else
+            {
+                forward =
+                    Vector3.ProjectOnPlane(
+                        defaultForwardDirection,
+                        gravityDirection).normalized;
+            }
+
+            if (forward.sqrMagnitude < 0.0001f)
+            {
+                forward =
+                    Vector3.ProjectOnPlane(Vector3.forward, gravityDirection).normalized;
+            }
+
+            if (forward.sqrMagnitude < 0.0001f)
+            {
+                forward = Vector3.Cross(gravityUp, Vector3.right).normalized;
+            }
+
+            if (forward.sqrMagnitude < 0.0001f)
+            {
+                forward = Vector3.Cross(gravityUp, Vector3.forward).normalized;
+            }
+
+            right = Vector3.Cross(gravityUp, forward).normalized;
         }
 
         private void HandleFreeFall()
@@ -173,24 +297,10 @@ namespace GravityPuzzle.Player
                 return;
             }
 
-            airTimer += Time.deltaTime;
+            airTimer += Time.fixedDeltaTime;
 
             if (airTimer >= maxAirTimeBeforeDeath)
                 GameManager.Instance.LoseGame();
-        }
-
-        private void AlignToGravity()
-        {
-            Quaternion targetRotation =
-                Quaternion.FromToRotation(
-                    transform.up,
-                    -GravityManager.Instance.CurrentGravity.normalized)
-                * transform.rotation;
-
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                targetRotation,
-                10f * Time.deltaTime);
         }
 
         private void OnDrawGizmosSelected()
@@ -200,12 +310,12 @@ namespace GravityPuzzle.Player
 
             Gizmos.color = Color.green;
 
-            Vector3 gravityDirection =
+            Vector3 debugGravityDirection =
                 GravityManager.Instance.CurrentGravity.normalized;
 
             Gizmos.DrawRay(
                 transform.position,
-                gravityDirection * 2f);
+                debugGravityDirection * 2f);
         }
     }
 }
