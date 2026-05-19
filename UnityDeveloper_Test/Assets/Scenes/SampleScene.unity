@@ -3386,7 +3386,7 @@ GameObject:
   - component: {fileID: 1586711743}
   - component: {fileID: 1586711742}
   - component: {fileID: 1586711746}
-  - component: {fileID: 1586711745}
+  - component: {fileID: 1586711747}
   - component: {fileID: 1586711739}
   m_Layer: 0
   m_Name: CinemachineFreeLookCamera
@@ -3436,7 +3436,7 @@ MonoBehaviour:
         DecelTime: 0.12
     - Name: Orbit Scale
       Owner: {fileID: 1586711742}
-      Enabled: 1
+      Enabled: 0
       Input:
         LegacyInput: Mouse ScrollWheel
         LegacyGain: -100
@@ -3485,7 +3485,7 @@ MonoBehaviour:
     Wrap: 0
     Recentering:
       Enabled: 1
-      Wait: 2
+      Wait: 1
       Time: 0.8
     Restrictions: 0
   VerticalAxis:
@@ -3566,36 +3566,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1586711745
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1586711738}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca7de3aefa901374ba29464584a3109a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineDecollider
-  CameraRadius: 0.6
-  Decollision:
-    Enabled: 1
-    ObstacleLayers:
-      serializedVersion: 2
-      m_Bits: 64
-    UseFollowTarget:
-      Enabled: 1
-      YOffset: 0
-    Damping: 0.5
-    SmoothingTime: 0
-  TerrainResolution:
-    Enabled: 0
-    TerrainLayers:
-      serializedVersion: 2
-      m_Bits: 64
-    MaximumRaycast: 0.3
-    Damping: 0.5
 --- !u!114 &1586711746
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3609,6 +3579,45 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineHardLookAt
   LookAtOffset: {x: 0, y: 0, z: 0}
+--- !u!114 &1586711747
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1586711738}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbe43d662878a7c43bcd44d43c9e2094, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineDeoccluder
+  CollideAgainst:
+    serializedVersion: 2
+    m_Bits: 512
+  IgnoreTag: 
+  TransparentLayers:
+    serializedVersion: 2
+    m_Bits: 64
+  MinimumDistanceFromTarget: 0.1
+  AvoidObstacles:
+    Enabled: 1
+    DistanceLimit: 0
+    MinimumOcclusionTime: 0
+    CameraRadius: 0.4
+    UseFollowTarget:
+      Enabled: 0
+      YOffset: 0
+    Strategy: 0
+    MaximumEffort: 2
+    SmoothingTime: 0.5
+    Damping: 0.1
+    DampingWhenOccluded: 0.2
+  ShotQualityEvaluation:
+    Enabled: 0
+    OptimalDistance: 10
+    NearLimit: 5
+    FarLimit: 30
+    MaxQualityBoost: 0.2
 --- !u!1 &1645246335
 GameObject:
   m_ObjectHideFlags: 0
@@ -4028,6 +4037,66 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1893096419}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1925366279
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1925366281}
+  - component: {fileID: 1925366280}
+  m_Layer: 0
+  m_Name: LayerAssingmentForCamera
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1925366280
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1925366279}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f24dd1ec6a0edcc4bad50795f4129e1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GravityPuzzle.CameraSystem.DynamicCameraObstacleAssigner
+  player: {fileID: 543450653259175915}
+  gravitySurfaces:
+  - {fileID: 194506411}
+  - {fileID: 1645246335}
+  - {fileID: 1233293751}
+  - {fileID: 1934019759}
+  - {fileID: 780541851}
+  - {fileID: 1151311460}
+  - {fileID: 967953311}
+  - {fileID: 1893096419}
+  activeGroundLayer: Ground
+  inactiveObstacleLayer: CameraObstacle
+  rayDistance: 5
+  detectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!4 &1925366281
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1925366279}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.59007, y: 3.80596, z: 3.44882}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1934019759
 GameObject:
   m_ObjectHideFlags: 0
@@ -4548,7 +4617,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GravityPuzzle.Player.PlayerController
   moveSpeed: 2.5
-  rotationSpeed: 6
+  rotationSpeed: 4
   jumpForce: 8
   jumpCooldown: 1.8
   gravityForce: 50
@@ -9608,3 +9677,4 @@ SceneRoots:
   - {fileID: 511929006}
   - {fileID: 837749320}
   - {fileID: 1571869441}
+  - {fileID: 1925366281}

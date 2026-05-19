@@ -72,7 +72,6 @@ namespace GravityPuzzle.UI
         private void AnimateCubeCollection()
         {
             cubeRect.DOKill();
-
             cubeRect.localScale = Vector3.one;
 
             cubeRect

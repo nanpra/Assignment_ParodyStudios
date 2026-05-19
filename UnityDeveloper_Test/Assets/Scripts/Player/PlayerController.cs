@@ -34,6 +34,7 @@ namespace GravityPuzzle.Player
 
         private Vector3 defaultForwardDirection;
         private Vector3 currentFacingDirection;
+        private Vector3 previousGravityDirection;
         private Vector3 gravityDirection;
         private Vector3 moveDirection;
         private Vector3 velocity;
@@ -61,6 +62,7 @@ namespace GravityPuzzle.Player
                 defaultForwardDirection = Vector3.forward;
 
             currentFacingDirection = defaultForwardDirection;
+            previousGravityDirection = gravityDirection;
         }
 
         private void Update()
@@ -145,38 +147,59 @@ namespace GravityPuzzle.Player
         private void HandleGravityAlignmentAndFacing()
         {
             Vector3 gravityUp = -gravityDirection;
-            GetReferenceMovementBasis(out Vector3 basisForward, out Vector3 basisRight);
 
-            Vector3 desiredFacing =
-                Vector3.ProjectOnPlane(currentFacingDirection, gravityDirection).normalized;
+            if (mainCam == null)
+                mainCam = Camera.main;
 
-            if (desiredFacing.sqrMagnitude < 0.0001f)
-                desiredFacing = basisForward;
+            bool gravityChanged =
+                Vector3.Angle(previousGravityDirection, gravityDirection) > 1f;
 
-            bool hasMoveInput =
-                Mathf.Abs(moveInput.x) > 0.1f || Mathf.Abs(moveInput.y) > 0.1f;
+            Vector3 desiredForward =
+                currentFacingDirection;
 
-            if (hasMoveInput)
+            // ONLY while pressing W follow camera direction
+            if (moveInput.y > 0.1f && mainCam != null)
             {
-                desiredFacing =
-                    (basisForward * moveInput.y + basisRight * moveInput.x).normalized;
+                desiredForward =
+                    Vector3.ProjectOnPlane(
+                        mainCam.transform.forward,
+                        gravityDirection).normalized;
             }
 
-            if (desiredFacing.sqrMagnitude < 0.0001f)
-                desiredFacing = basisForward;
+            // Preserve facing direction during gravity changes
+            desiredForward =
+                Vector3.ProjectOnPlane(
+                    desiredForward,
+                    gravityDirection).normalized;
+
+            if (desiredForward.sqrMagnitude < 0.0001f)
+            {
+                desiredForward =
+                    Vector3.ProjectOnPlane(
+                        transform.forward,
+                        gravityDirection).normalized;
+            }
+
+            if (desiredForward.sqrMagnitude < 0.0001f)
+                return;
 
             Quaternion targetRotation =
                 Quaternion.LookRotation(
-                    desiredFacing.normalized,
+                    desiredForward,
                     gravityUp);
 
-            float rotationBlend =
-                1f - Mathf.Exp(-rotationSpeed * Time.fixedDeltaTime);
+            float blendSpeed =
+                gravityChanged ? 12f : rotationSpeed;
 
-            Quaternion smoothedRotation = Quaternion.Slerp(
-                body.rotation,
-                targetRotation,
-                rotationBlend);
+            float rotationBlend =
+                1f - Mathf.Exp(-blendSpeed * Time.fixedDeltaTime);
+
+            Quaternion smoothedRotation =
+                Quaternion.Slerp(
+                    body.rotation,
+                    targetRotation,
+                    rotationBlend);
+
             body.MoveRotation(smoothedRotation);
 
             currentFacingDirection =
@@ -184,8 +207,7 @@ namespace GravityPuzzle.Player
                     smoothedRotation * Vector3.forward,
                     gravityDirection).normalized;
 
-            if (currentFacingDirection.sqrMagnitude < 0.0001f)
-                currentFacingDirection = desiredFacing;
+            previousGravityDirection = gravityDirection;
         }
 
         private void HandleJump()
@@ -206,9 +228,7 @@ namespace GravityPuzzle.Player
                 Vector3.Dot(currentVelocity, gravityDirection);
 
             if (gravityVelocity > 0f)
-            {
                 currentVelocity -= gravityDirection * gravityVelocity;
-            }
 
             currentVelocity += -gravityDirection * jumpForce;
             body.linearVelocity = currentVelocity;
@@ -271,20 +291,13 @@ namespace GravityPuzzle.Player
             }
 
             if (forward.sqrMagnitude < 0.0001f)
-            {
-                forward =
-                    Vector3.ProjectOnPlane(Vector3.forward, gravityDirection).normalized;
-            }
+                forward = Vector3.ProjectOnPlane(Vector3.forward, gravityDirection).normalized;
 
             if (forward.sqrMagnitude < 0.0001f)
-            {
                 forward = Vector3.Cross(gravityUp, Vector3.right).normalized;
-            }
 
             if (forward.sqrMagnitude < 0.0001f)
-            {
                 forward = Vector3.Cross(gravityUp, Vector3.forward).normalized;
-            }
 
             right = Vector3.Cross(gravityUp, forward).normalized;
         }
@@ -301,21 +314,6 @@ namespace GravityPuzzle.Player
 
             if (airTimer >= maxAirTimeBeforeDeath)
                 GameManager.Instance.LoseGame();
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            if (GravityManager.Instance == null)
-                return;
-
-            Gizmos.color = Color.green;
-
-            Vector3 debugGravityDirection =
-                GravityManager.Instance.CurrentGravity.normalized;
-
-            Gizmos.DrawRay(
-                transform.position,
-                debugGravityDirection * 2f);
         }
     }
 }
